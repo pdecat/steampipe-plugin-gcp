@@ -116,7 +116,7 @@ func tableGcpCloudIdentityGroup(_ context.Context) *plugin.Table {
 				Name:        "project",
 				Description: ColumnDescriptionProject,
 				Type:        proto.ColumnType_STRING,
-				Hydrate:     plugin.HydrateFunc(getProject).WithCache(),
+				Hydrate:     getProject,
 				Transform:   transform.FromValue(),
 			},
 		},
