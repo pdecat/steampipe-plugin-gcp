@@ -11,6 +11,7 @@ import (
 
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin"
 	"github.com/turbot/steampipe-plugin-sdk/v5/plugin/transform"
+	"github.com/turbot/steampipe-plugin-sdk/v5/rate_limiter"
 )
 
 const pluginName = "steampipe-plugin-gcp"
@@ -35,6 +36,31 @@ func Plugin(ctx context.Context) *plugin.Plugin {
 		},
 		ConnectionConfigSchema: &plugin.ConnectionConfigSchema{
 			NewInstance: ConfigInstance,
+		},
+		RateLimiters: []*rate_limiter.Definition{
+			// FIXME: Limits are per API consumer project so we need to find a way to take quota_project into account instead of connection
+			// https://cloud.google.com/resource-manager/docs/limits
+			{
+				Name:       "gcp_cloudresourcemanager_projects_get_access_approval_settings",
+				FillRate:   10,
+				BucketSize: 10,
+				Scope:      []string{"connection", "service", "action"},
+				Where:      "service = 'cloudresourcemanager' and action = 'ProjectsGetAccessApprovalSettings'",
+			},
+			{
+				Name:       "gcp_cloudresourcemanager_projects_list",
+				FillRate:   4,
+				BucketSize: 4,
+				Scope:      []string{"connection", "service", "action"},
+				Where:      "service = 'cloudresourcemanager' and action = 'ProjectsList'",
+			},
+			{
+				Name:       "gcp_cloudresourcemanager_projects_get_ancestry",
+				FillRate:   10,
+				BucketSize: 10,
+				Scope:      []string{"connection", "service", "action"},
+				Where:      "service = 'cloudresourcemanager' and action = 'ProjectsGetAncestry'",
+			},
 		},
 		TableMap: map[string]*plugin.Table{
 			"gcp_alloydb_cluster":                                     tableGcpAlloyDBCluster(ctx),
