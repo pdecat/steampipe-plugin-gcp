@@ -42,6 +42,11 @@ func tableGcpFirestoreDatabase(ctx context.Context) *plugin.Table {
 				Type:        proto.ColumnType_STRING,
 			},
 			{
+				Name:        "cmek_config",
+				Description: "The CMEK (Customer Managed Encryption Key) configuration for the database.",
+				Type:        proto.ColumnType_JSON,
+			},
+			{
 				Name:        "concurrency_mode",
 				Description: "The concurrency control mode to use for this database.",
 				Type:        proto.ColumnType_STRING,
@@ -97,6 +102,11 @@ func tableGcpFirestoreDatabase(ctx context.Context) *plugin.Table {
 				Description: "Server-defined URL for the resource.",
 				Type:        proto.ColumnType_STRING,
 				Transform:   transform.From(firestoreDatabaseSelfLink),
+			},
+			{
+				Name:        "source_info",
+				Description: "Information about the provenance of this database.",
+				Type:        proto.ColumnType_JSON,
 			},
 			{
 				Name:        "type",
