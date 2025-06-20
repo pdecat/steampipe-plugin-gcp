@@ -1,4 +1,4 @@
-module github.com/turbot/steampipe-plugin-gcp
+module github.com/pdecat/steampipe-plugin-gcp
 
 go 1.24
 
