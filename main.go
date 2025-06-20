@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/turbot/steampipe-plugin-gcp/gcp"
+	"github.com/pdecat/steampipe-plugin-gcp/gcp"
 	"github.com/turbot/steampipe-plugin-sdk/v6/plugin"
 )
 
