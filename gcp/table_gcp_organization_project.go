@@ -74,7 +74,7 @@ func tableGcpOrganizationProject(_ context.Context) *plugin.Table {
 				Description: "The ancestors of the project in the resource hierarchy, from bottom to top.",
 				Type:        proto.ColumnType_JSON,
 				Hydrate:     getProjectAncestors,
-				Transform:   transform.FromValue(),
+				Transform:   transform.FromValue().NullIfEmptySlice(),
 			},
 			{
 				Name:        "billing_information",
