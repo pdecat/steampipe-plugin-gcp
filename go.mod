@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/resourcemanager v1.10.3
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/turbot/go-kit v1.1.0
-	github.com/turbot/steampipe-plugin-sdk/v6 v6.0.0
+	github.com/turbot/steampipe-plugin-sdk/v6 v6.1.0
 	google.golang.org/api v0.214.0
 )
 
@@ -119,4 +119,4 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-replace github.com/turbot/steampipe-plugin-sdk/v6 => github.com/pdecat/steampipe-plugin-sdk/v6 v6.0.1-dev1
+replace github.com/turbot/steampipe-plugin-sdk/v6 => github.com/pdecat/steampipe-plugin-sdk/v6 v6.1.1-dev1
