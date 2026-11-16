@@ -127,6 +127,24 @@ func Plugin(ctx context.Context) *plugin.Plugin {
 				Where:      "service = 'billing' and action in ('accounts.get', 'projects.getBillingInfo')",
 			},
 
+			// BigQuery API: 100 requests per second per user per method, and 300 concurrent requests
+			// per user. Doc: https://cloud.google.com/bigquery/quotas#api_request_quotas
+			// Tables: gcp_bigquery_dataset, gcp_bigquery_table
+			// The limits count the credentials across every project, so the scope leaves out the
+			// connection, and each method gets its own bucket, as it does its own limit.
+			// tables.get is hydrated once per table, so a project holding thousands of tables, such
+			// as date-sharded exports, fans out to as many calls as fast as the API answers, past the
+			// limit: Error 403 rateLimitExceeded, which fails the whole scan unless retried (see
+			// shouldRetryErrorPluginDefault). Half the limit leaves room for the other processes
+			// sharing the credentials, while thousands of tables still list in a couple of minutes.
+			{
+				Name:       "gcp_bigquery",
+				FillRate:   50,
+				BucketSize: 50,
+				Scope:      []string{"service", "action"},
+				Where:      "service = 'bigquery' and action in ('datasets.list', 'datasets.get', 'tables.list', 'tables.get')",
+			},
+
 			// Compute Engine API rate quotas are enforced per minute and vary by project and method group.
 			// This limiter targets a conservative 10 rps with a burst of 20 for common read/list methods.
 			// Doc: https://cloud.google.com/compute/api-quota and metrics: https://cloud.google.com/compute/docs/api/compute-api-quota-metrics

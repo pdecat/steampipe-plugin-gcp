@@ -78,11 +78,30 @@ var retryableErrorCodes = []int{
 	http.StatusGatewayTimeout,
 }
 
+// Reasons a GCP API gives with a 403 for a rate limit, not a missing permission: BigQuery
+// answers "Exceeded rate limits: too many api requests per user per method" this way, with the
+// reason rateLimitExceeded. A quotaExceeded is left out, it is a daily quota that does not
+// clear within the retries' backoff.
+var retryableForbiddenReasons = []string{"rateLimitExceeded", "userRateLimitExceeded"}
+
 // shouldRetryErrorPluginDefault:: Plugin level default function to retry the transient errors hydrate functions get, so that one failed call does not fail the whole query
 func shouldRetryErrorPluginDefault() plugin.ErrorPredicateWithContext {
 	// The SDK logs the retry decision and every attempt it then makes, so this only decides.
 	return func(_ context.Context, _ *plugin.QueryData, _ *plugin.HydrateData, err error) bool {
 		var gerr *googleapi.Error
-		return errors.As(err, &gerr) && slices.Contains(retryableErrorCodes, gerr.Code)
+		if !errors.As(err, &gerr) {
+			return false
+		}
+		if slices.Contains(retryableErrorCodes, gerr.Code) {
+			return true
+		}
+		if gerr.Code == http.StatusForbidden {
+			for _, item := range gerr.Errors {
+				if slices.Contains(retryableForbiddenReasons, item.Reason) {
+					return true
+				}
+			}
+		}
+		return false
 	}
 }
