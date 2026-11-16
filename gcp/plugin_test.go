@@ -144,10 +144,66 @@ func TestShouldRetryErrorPluginDefault(t *testing.T) {
 		{&googleapi.Error{Code: 403, Message: "Permission denied"}, false},
 		{&googleapi.Error{Code: 404, Message: "Not found"}, false},
 		{errors.New("context canceled"), false},
+		// BigQuery reports its per user rate limit as a 403, which clears on its own.
+		{&googleapi.Error{Code: 403, Message: "Exceeded rate limits: too many api requests per user per method for this user_method (TableService.getTable).",
+			Errors: []googleapi.ErrorItem{{Reason: "rateLimitExceeded"}}}, true},
+		{&googleapi.Error{Code: 403, Errors: []googleapi.ErrorItem{{Reason: "userRateLimitExceeded"}}}, true},
+		{fmt.Errorf("getBigqueryTable: %w", &googleapi.Error{Code: 403, Errors: []googleapi.ErrorItem{{Reason: "rateLimitExceeded"}}}), true},
+		// A daily quota and a missing permission do not clear within the retries.
+		{&googleapi.Error{Code: 403, Errors: []googleapi.ErrorItem{{Reason: "quotaExceeded"}}}, false},
+		{&googleapi.Error{Code: 403, Errors: []googleapi.ErrorItem{{Reason: "forbidden"}}}, false},
 	}
 	for _, test := range tests {
 		if retry := shouldRetry(context.Background(), nil, nil, test.err); retry != test.retry {
 			t.Errorf("retrying %v: %t, expected %t", test.err, retry, test.retry)
 		}
 	}
+}
+
+// BigQuery limits each method per user, across every project the credentials reach: one bucket per
+// method, shared by every connection, kept under the documented 100 requests per second.
+func TestBigQueryRateLimiter(t *testing.T) {
+	definition := rateLimiterDefinition(t, "gcp_bigquery")
+
+	if !reflect.DeepEqual(definition.Scope, []string{"service", "action"}) {
+		t.Errorf("gcp_bigquery scope is %v, expected one bucket per method shared by every connection", definition.Scope)
+	}
+	if float64(definition.FillRate) > 100 || definition.BucketSize > 100 {
+		t.Errorf("gcp_bigquery allows %v per second with a burst of %d, over the 100 per second per method limit",
+			definition.FillRate, definition.BucketSize)
+	}
+
+	calls := map[string]bool{
+		"bigquery/tables.get":    true,
+		"bigquery/tables.list":   true,
+		"bigquery/datasets.get":  true,
+		"bigquery/datasets.list": true,
+		"billing/accounts.get":   false,
+		"storage/buckets.list":   false,
+	}
+	for call, want := range calls {
+		service, action, _ := strings.Cut(call, "/")
+		scopeValues := map[string]string{"connection": "gcp", "service": service, "action": action}
+		if matched := definition.SatisfiesFilters(scopeValues); matched != want {
+			t.Errorf("gcp_bigquery matches %s: %t, expected %t", call, matched, want)
+		}
+	}
+}
+
+// getBigqueryTable is hydrated once per table: without the tags the limiter filters on, its calls
+// run uncapped and nothing says so.
+func TestBigQueryTableGetHydrateIsTagged(t *testing.T) {
+	table := Plugin(context.Background()).TableMap["gcp_bigquery_table"]
+	if table == nil {
+		t.Fatal("plugin has no table named gcp_bigquery_table")
+	}
+	for _, hydrateConfig := range table.HydrateConfig {
+		if sameHydrateFunc(hydrateConfig.Func, getBigqueryTable) {
+			if hydrateConfig.Tags["service"] != "bigquery" || hydrateConfig.Tags["action"] != "tables.get" {
+				t.Errorf("gcp_bigquery_table tags getBigqueryTable as %v, which the gcp_bigquery limiter does not match", hydrateConfig.Tags)
+			}
+			return
+		}
+	}
+	t.Error("gcp_bigquery_table has no hydrate config for getBigqueryTable, so its calls are not rate limited")
 }
